@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>❄️ 冷链药品智能调度系统</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ========== 顶部导航 ========== -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon">❄️</div>
+    <div>
+      <h1>冷链药品智能调度系统</h1>
+      <p>Cold Chain Pharma Smart Scheduling · 2~8℃ 全程温控</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="data-source" id="dataSource">未加载数据</span>
+    <span class="status-pill" id="statusPill"><span class="dot"></span>服务检查中</span>
+    <button class="nav-btn" onclick="location.href='index.html'" style="background:rgba(255,255,255,.3)">🚚 智能调度</button>
+    <button class="nav-btn" onclick="location.href='packing.html'">📦 货品配载</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ========== 左侧：数据与参数 ========== -->
+  <aside class="sidebar">
+    <!-- 数据卡片 -->
+    <section class="card">
+      <div class="card-head">
+        <h2>📦 数据管理</h2>
+        <label class="upload-btn">
+          加载 Excel
+          <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+        </label>
+      </div>
+      <div class="ov-grid">
+        <div class="ov-item"><span class="ov-num" id="ovDepot">-</span><span class="ov-label">配送中心</span></div>
+        <div class="ov-item"><span class="ov-num" id="ovDemand">-</span><span class="ov-label">需求点</span></div>
+        <div class="ov-item"><span class="ov-num" id="ovTotalKg">-</span><span class="ov-label">总需求量(kg)</span></div>
+        <div class="ov-item"><span class="ov-num" id="ovVehicles">-</span><span class="ov-label">可用车辆</span></div>
+      </div>
+      <div class="warn-box" id="warnBox" hidden></div>
+      <p class="inline-hint" id="fileHint">📥 请先点击「加载 Excel」选择数据文件，或使用内置示例数据</p>
+      <button class="btn-mini" id="loadDemoBtn">📂 加载内置示例数据</button>
+    </section>
+
+    <!-- 参数配置 -->
+    <section class="card">
+      <div class="card-head"><h2>⚙️ 调度参数</h2></div>
+      <div class="param-grid">
+        <label>固定出车成本 c0 (元/辆)
+          <input type="number" id="p_c0" value="300" step="10"></label>
+        <label>里程成本 c1 (元/km)
+          <input type="number" id="p_c1" value="2.5" step="0.1"></label>
+        <label>制冷成本 c2 (元/h)
+          <input type="number" id="p_c2" value="8.0" step="0.5"></label>
+        <label>单车容量 Q_max (kg)
+          <input type="number" id="p_Qmax" value="500" step="50"></label>
+        <label>平均车速 (km/h)
+          <input type="number" id="p_vavg" value="100" step="5"></label>
+        <label>单趟限时 T_max (h)
+          <input type="number" id="p_Tmax" value="24" step="1"></label>
+        <label>时间窗缓冲 (h)
+          <input type="number" id="p_buffer" value="0" step="0.1" min="0"></label>
+        <label>求解时限 (秒)
+          <input type="number" id="p_timeLimit" value="120" step="10" min="5"></label>
+        <label>最多用车数
+          <input type="number" id="p_maxVehicles" value="" placeholder="不限"></label>
+        <label>参与调度点数
+          <input type="number" id="p_maxNodes" value="" placeholder="全部"></label>
+        <label>异常点半径 (km)
+          <input type="number" id="p_radius" value="200" step="10"></label>
+        <label>初始解策略
+          <select id="p_strategy">
+            <option value="PATH_CHEAPEST_ARC">PATH_CHEAPEST_ARC</option>
+            <option value="SAVINGS">SAVINGS</option>
+            <option value="CHRISTOFIDES">CHRISTOFIDES</option>
+            <option value="PARALLEL_CHEAPEST_INSERTION">PARALLEL_CHEAPEST_INSERTION</option>
+          </select></label>
+        <label>邻域搜索
+          <select id="p_meta">
+            <option value="GUIDED_LOCAL_SEARCH">GUIDED_LOCAL_SEARCH</option>
+            <option value="TABU_SEARCH">TABU_SEARCH</option>
+            <option value="SIMULATED_ANNEALING">SIMULATED_ANNEALING</option>
+            <option value="GREEDY_DESCENT">GREEDY_DESCENT</option>
+          </select></label>
+        <label class="checkbox-label"><input type="checkbox" id="p_excludeFar" checked> 自动排除远距离异常点</label>
+        <label>调度日期
+          <input type="date" id="p_date"></label>
+      </div>
+      <button class="btn-primary" id="solveBtn">🚀 一键智能调度</button>
+      <div class="progress-wrap" id="progressWrap" hidden>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <span id="progressText">正在求解中...</span>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ========== 右侧：结果展示 ========== -->
+  <section class="content">
+    <!-- 汇总指标 -->
+    <section class="kpi-row" id="kpiRow">
+      <div class="kpi-card"><div class="kpi-num" id="kUsed">-</div><div class="kpi-label">使用车辆</div></div>
+      <div class="kpi-card"><div class="kpi-num" id="kDist">-</div><div class="kpi-label">总里程 (km)</div></div>
+      <div class="kpi-card"><div class="kpi-num" id="kCost">-</div><div class="kpi-label">总成本 (元)</div></div>
+      <div class="kpi-card"><div class="kpi-num" id="kTime">-</div><div class="kpi-label">总驾驶时长 (h)</div></div>
+      <div class="kpi-card"><div class="kpi-num" id="kLoad">-</div><div class="kpi-label">平均装载率</div></div>
+      <div class="kpi-card"><div class="kpi-num" id="kSolve">-</div><div class="kpi-label">求解耗时 (s)</div></div>
+    </section>
+
+    <!-- 工具条 -->
+    <section class="toolbar" id="toolbar" hidden>
+      <div class="toolbar-title" id="scheduleTitle"></div>
+      <div class="toolbar-actions">
+        <button class="btn" id="exportRouteBtn">🗺️ 导出路线(配载联动)</button>
+        <button class="btn" id="exportCsvBtn">📄 导出 CSV</button>
+      </div>
+    </section>
+
+    <!-- 地图 -->
+    <section class="card map-card" id="mapCard" hidden>
+      <div class="card-head"><h2>🗺️ 配送路线可视化</h2>
+        <div class="map-controls">
+          <div class="view-tabs">
+            <button class="view-tab active" id="tabReal">🗺️ 真实地图</button>
+            <button class="view-tab" id="tabSvg">📐 示意图</button>
+          </div>
+          <select id="tileSource" title="地图底图">
+            <option value="gaode">高德中文底图</option>
+            <option value="osm">OpenStreetMap</option>
+            <option value="carto">CartoDB 英文</option>
+          </select>
+        </div>
+      </div>
+      <div class="map-legend" id="mapLegend"></div>
+      <div class="map-wrap" id="mapWrap">
+        <div id="realMap"></div>
+        <div id="svgMapWrap" hidden>
+          <svg id="mapSvg" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div class="map-tooltip" id="mapTooltip" hidden></div>
+      </div>
+      <div class="map-hint" id="mapHint">底图加载失败时自动切换到示意图</div>
+    </section>
+
+    <!-- 成本分解 -->
+    <section class="card" id="costCard" hidden>
+      <div class="card-head"><h2>💰 成本分解</h2></div>
+      <div class="cost-flex">
+        <div class="cost-donut-wrap"><canvas id="costCanvas" width="220" height="220"></canvas>
+          <div class="cost-center"><span id="costTotal">¥0</span><small>总成本</small></div>
+        </div>
+        <div class="cost-legend" id="costLegend"></div>
+      </div>
+    </section>
+
+    <!-- 路线明细 -->
+    <section class="card" id="routeCard" hidden>
+      <div class="card-head"><h2>🚚 车辆路线明细</h2><span class="route-count" id="routeCount"></span></div>
+      <div id="routeList" class="route-list"></div>
+    </section>
+
+    <!-- 司机任务单 -->
+    <section class="card" id="taskCard" hidden>
+      <div class="card-head"><h2>📋 司机任务单</h2></div>
+      <div id="taskList" class="task-list"></div>
+    </section>
+
+    <!-- 执行跟踪 -->
+    <section class="card" id="trackingCard" hidden>
+      <div class="card-head">
+        <h2>📍 执行跟踪</h2>
+        <div class="track-stats">
+          <span>工单 <b id="trackTotal">0</b></span>
+          <span>已完成 <b id="trackDone">0</b></span>
+          <span>准点率 <b id="trackOnTime">-</b></span>
+          <span>进行中 <b id="trackPending">0</b></span>
+        </div>
+      </div>
+      <p class="track-hint">按「已发车 → 已到达 → 已卸货 → 完成」流转工单；到达打点自动对比计划时间（±30 分钟内为准点）。数据保存在浏览器本地，配载页自动读取。</p>
+      <div id="trackList" class="track-list"></div>
+    </section>
+
+    <!-- 空状态 -->
+    <section class="empty-state" id="emptyState">
+      <div class="empty-icon">🗺️</div>
+      <h3>等待调度</h3>
+      <p>配置左侧参数后，点击「一键智能调度」生成优化配送方案</p>
+    </section>
+  </section>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+
+<!-- Leaflet 真实地图引擎（CDN；加载失败自动回退 SVG 示意图） -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- SheetJS：浏览器端解析 Excel（纯前端，无需后端） -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+
+<script src="order_model.js"></script>
+<script src="vrp_solver.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Git 忽略规则
+# 构建产物：单文件版 HTML 由 build_static_demo.py 重新生成，不入库
+冷链智能物流调度_智能调度版.html
+冷链智能物流调度_配载版.html
+*.html.bak
+
+# 中间产物
+使用说明_大件货品配载平台.html
+node_modules/
+__pycache__/
+*.pyc
+
+# 运行时输出
+output/
+packing_snapshot.json
+
+# 环境与凭据
+.env
+.venv/
+venv/
